@@ -1,45 +1,32 @@
-import { TabData } from "./definitions.js";
-import { isWithinXSeconds, logEvent } from "./utils.js";
+import {isWithinXSeconds} from "./utils.js";
+import { debug, error, info, log, warn } from "./utils.js";
 
 chrome.tabs.onCreated.addListener(onTabCreatedHandler);
-chrome.tabs.onRemoved.addListener(onTabRemovedHandler);
 chrome.tabs.onUpdated.addListener(onTabUpdatedHandler);
 
-var tabs = new Map<number, TabData>();
-
-function onTabRemovedHandler(tabId: number, removeInfo: chrome.tabs.TabRemoveInfo) {
-    if (tabs.get(tabId) != undefined) {
-        tabs.delete(tabId);
-    } else {
-        console.log("Tab not found in onTabRemovedHandler");
-    }
-}
-
+var exeSeq = 0;
 function onTabCreatedHandler(tab: chrome.tabs.Tab) {
+    let prefix = `onTabCreatedHandler: ${exeSeq++}:`;
+    info(prefix, 'Start');
+    debug(prefix, 'Event Data', tab);
+
     if (tab.id == undefined) {
-        logEvent('Tab id is undefined', tab);
+        warn(prefix, 'tab.id is undefined');
         return;
     }
     tabGroupAlgo(tab.id);
-
-    // print id, url, title and openerTabId of tab
-    let event_data = { event: 'onTabCreated',
-    id : tab.id,
-    url : tab.url,
-    title : tab.title,
-    openerTabId : tab.openerTabId};
-    console.log(JSON.stringify(event_data));
+    info(prefix, 'End');
 }
 
 function onTabUpdatedHandler(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
+    let prefix = `onTabUpdateHandler: ${exeSeq++}:`;
+    info(prefix, 'Start');
+    debug(prefix, 'Event Data', { tabId, changeInfo, tab });
     if (changeInfo.url != undefined) {
         return;
     }
     tabGroupAlgo(tabId);
-
-    // print id, url, title and status of tab
-    //logEvent('onTabUpdated', {tabId : tabId, changeInfo : changeInfo, tab : tab});
-    logEvent('onTabUpdated', {tabId : tabId});
+    info(prefix, 'End');
 }
 
 async function getReleventVisits(url: string, maxAgeSeconds: number = 5, limit : number = 3) {
@@ -47,7 +34,7 @@ async function getReleventVisits(url: string, maxAgeSeconds: number = 5, limit :
     try {
         visits = await chrome.history.getVisits({ url: url});
     } catch (e) {
-        logEvent('Error getting visits', { url, e });
+        error("", 'Error getting visits', { url, e });
         return [];
     }
     
@@ -66,42 +53,43 @@ async function getReleventVisits(url: string, maxAgeSeconds: number = 5, limit :
     return ret;
 }
 
-var algoRunCount = 0;
 async function tabGroupAlgo(tabId: number) {
-    let logTag = `${algoRunCount++}: tabGroupAlgo(${tabId}) :`;
-    logEvent(`${logTag} start`);
+    let prefix = `tabGroupAlgo: ${exeSeq++}:`;
+    info(prefix, `Start for tabID ${tabId}`);
 
     let tab;
     try {
         tab = await chrome.tabs.get(tabId)
     } catch (e) {
-        logEvent(`${logTag} Error getting tab`, { tabId, e });
-        logEvent(`${logTag} : end`);
+        error(prefix, 'Error getting tab', { tabId, e });
         return;
     }
+
+    debug(prefix, 'Tab Data', tab);
 
     let tabUrl = tab.pendingUrl || tab.url;
     if (tabUrl == undefined || tabUrl == "") {
         return;
     }
     
-    let visits = await getReleventVisits(tabUrl, 10, 1);
+    let visits = await getReleventVisits(tabUrl, 10, 2);
     if (visits.length == 0) {
-        logEvent(`${logTag} No visits found`, { tabId, tabUrl });
-        logEvent(`${logTag} : end`);
+        info(prefix, 'No visits found');
         return;
     }
 
     if (tab.groupId > 0) {
-        logEvent('Tab is in a group', { tabId, groupId: tab.groupId });
-        if(visits[0].transition == "typed") {
-            logEvent('ungrouping', { tabId, groupId: tab.groupId });
+        info(prefix, 'Tab already in a group. Checking if it needs to be ungrouped');
+
+        if(visits[0].transition == "typed" || visits[0].transition == "generated") {
+            info(prefix, 'Tab is in a group and typed. Ungrouping');
             chrome.tabs.ungroup(tabId)
         } else {
-            logEvent('Tab is in a group and not typed', visits[0]);
+            debug(prefix, 'Tab is in a group and not typed. Ignoring', { tabId, visits });
         }
     } else {
-        if(visits[0].transition == "link" || visits[0].transition == "form_submitted") {
+        let v0 = visits[0];
+        if((v0.transition == "link" || v0.transition == "form_submitted") && v0.referringVisitId !== '0') {
             if (tab.openerTabId != undefined) {
                 try {
                     let openerTab = await chrome.tabs.get(tab.openerTabId)
@@ -111,10 +99,12 @@ async function tabGroupAlgo(tabId: number) {
                         chrome.tabs.group({tabIds: [tabId, tab.openerTabId]})
                     }
                 } catch (e) {
-                    logEvent('Error getting opener tab', { openerTabId: tab.openerTabId, e });
+                    error(prefix, 'Error getting opener tab', { openerTabId: tab.openerTabId, e });
                 }
             }
+        } else {
+            debug(prefix, 'Transition is not "linked" or "form_submitted"', { tabId, visits });
         }
     }
-    logEvent(`${logTag} : end`);
+    debug(prefix, 'End');
 }
