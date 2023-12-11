@@ -3,6 +3,15 @@ import { debug, error, info, log, warn } from "./utils.js";
 
 chrome.tabs.onCreated.addListener(onTabCreatedHandler);
 chrome.tabs.onUpdated.addListener(onTabUpdatedHandler);
+chrome.webNavigation.onCreatedNavigationTarget.addListener(onCreatedNavigationTargetHandler);
+
+function onCreatedNavigationTargetHandler(details: chrome.webNavigation.WebNavigationSourceCallbackDetails) {
+    let prefix = `onCreatedNavigationTargetHandler: ${exeSeq++}:`;
+    debug(prefix, 'Start');
+    debug(prefix, 'Event Data', details);
+    groupTabs(details.sourceTabId, details.tabId);
+    debug(prefix, 'End');
+}
 
 var exeSeq = 0;
 function onTabCreatedHandler(tab: chrome.tabs.Tab) {
@@ -20,9 +29,9 @@ function onTabCreatedHandler(tab: chrome.tabs.Tab) {
 
 function onTabUpdatedHandler(tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
     let prefix = `onTabUpdateHandler: ${exeSeq++}:`;
-    info(prefix, 'Start');
+    debug(prefix, 'Start');
     debug(prefix, 'Event Data', { tabId, changeInfo, tab });
-    if (changeInfo.url != undefined) {
+    if (changeInfo.url === undefined) {
         return;
     }
     tabGroupAlgo(tabId);
@@ -54,6 +63,7 @@ async function getReleventVisits(url: string, maxAgeSeconds: number = 5, limit :
 }
 
 async function tabGroupAlgo(tabId: number) {
+    return;
     let prefix = `tabGroupAlgo: ${exeSeq++}:`;
     info(prefix, `Start for tabID ${tabId}`);
 
@@ -91,20 +101,28 @@ async function tabGroupAlgo(tabId: number) {
         let v0 = visits[0];
         if((v0.transition == "link" || v0.transition == "form_submitted") && v0.referringVisitId !== '0') {
             if (tab.openerTabId != undefined) {
-                try {
-                    let openerTab = await chrome.tabs.get(tab.openerTabId)
-                    if (openerTab.groupId > 0) {
-                        chrome.tabs.group({tabIds: [tabId], groupId: openerTab.groupId})
-                    } else {
-                        chrome.tabs.group({tabIds: [tabId, tab.openerTabId]})
-                    }
-                } catch (e) {
-                    error(prefix, 'Error getting opener tab', { openerTabId: tab.openerTabId, e });
-                }
+                groupTabs(tab.openerTabId, tabId)
             }
         } else {
-            debug(prefix, 'Transition is not "linked" or "form_submitted"', { tabId, visits });
+            debug(prefix, 'Transition is not "link" or "form_submitted"');
         }
     }
     debug(prefix, 'End');
+}
+
+async function groupTabs(parentTabId: number, childTabId: number) {
+    info("", "Grouping tabs", { parentTabId, childTabId })
+    try {
+        let parentTab = await chrome.tabs.get(parentTabId)
+
+        if (parentTab.groupId > 0) {
+            chrome.tabs.group({tabIds: [childTabId], groupId: parentTab.groupId})
+        } else {
+            chrome.tabs.group({tabIds: [parentTabId, childTabId]}, (groupId) => {
+                chrome.tabGroups.update( groupId, {title: parentTab.title})
+            })
+        }
+    } catch (e) {
+        error("", 'Error grouping tabs', { parentTabId, childTabId, e });
+    }
 }
