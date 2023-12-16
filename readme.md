@@ -1,23 +1,13 @@
+
+## Setting up the Repository
+
+## Compiling and Testing Locally
+
+
 ```
-tab_id
-    - openerTabId
-    - tab_history[]
-        - url,
-        - visitId
-        - visitTime
-
-
-VisitItem
-    - visitId
-    - referringVisitId
-    - visitTime
-    - id : historyId
-    - transition
-        - link
-
-TransitionType
-    - link : add to previousTabGroup
-    - typed: remove from TabGroup
-    - form_submit: add to previousTabGroup
-    - reload: ignore
+npm run build
 ```
+
+The extension is generated in `out/` directory.
+
+Open Google Chrome and navigate to `chrome://extensions`
