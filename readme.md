@@ -4,6 +4,10 @@ Many of us often find ourselves overwhelmed with numerous open Chrome tabs, maki
 
 Introducing our Chrome extension, designed to streamline this process. This extension automates the organization of tabs by grouping them together when opened through links in other tabs. As you close tabs, the extension dynamically manages TabGroups – automatically deleting a TabGroup if it contains only one remaining tab. Enjoy a more efficient and hassle-free tab management experience with our extension.
 
+### TODO
+* When using duplicate tab functionality, the tabs should group together
+* User should be able to control the behaviour of the extension
+
 ## Setting up the Repository
 
 ## Compiling and Testing Locally

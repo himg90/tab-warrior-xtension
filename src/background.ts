@@ -1,4 +1,4 @@
-import { debug, error, info, log, warn } from "./utils.js";
+import { debug, error, info, log, warn } from "./log-utils.js";
 
 chrome.webNavigation.onCreatedNavigationTarget.addListener(onCreatedNavigationTargetHandler);
 chrome.tabs.onRemoved.addListener(onTabRemovedHandler);

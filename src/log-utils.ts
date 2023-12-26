@@ -1,9 +1,3 @@
-// export function isWithinXSeconds(visitTime: number, threshold: number): boolean {
-//     const currentTime = Date.now();
-//     const differenceInSeconds = (currentTime - visitTime) / 1000;
-//     return differenceInSeconds <= threshold;
-// }
-
 export enum LogLevel {
     Error = 1,
     Warn,
